@@ -32,6 +32,17 @@ def fetch_html():
     return content
 
 
+def get_salario_for_nivel(nivel, salarios):
+    m = re.match(r"(\d+)-([A|B|C])", nivel)
+    salario = ''
+    if m:
+        row, col = m.groups()
+        row = int(row) - 5
+        col = {"A": 1, "B": 2, "C": 3}.get(col)
+        salario = salarios[row][col]
+    return salario
+
+
 def main():
     html_str = fetch_html()
     soup = BeautifulSoup(html_str, "html.parser")
@@ -49,13 +60,7 @@ def main():
         funcionarios[0] += ["SALARIO"]
         for f in funcionarios:
             nivel = f[-1]
-            m = re.match(r"(\d+)-([A|B|C])", nivel)
-            salario = ''
-            if m:
-                row, col = m.groups()
-                row = int(row) - 5
-                col = {"A": 1, "B": 2, "C": 3}.get(col)
-                salario = salarios[row][col]
+            salario = get_salario_for_nivel(nivel, salarios)
             writer.writerow(f + [salario])
 
 
