@@ -43,6 +43,14 @@ def get_salario_for_nivel(nivel, salarios):
     return salario
 
 
+def add_salary_to_funcionarios(funcionarios, salarios):
+    yield funcionarios[0] + ["SALARIO"]
+    for f in funcionarios[1:]:
+        nivel = f[-1]
+        salario = get_salario_for_nivel(nivel, salarios)
+        yield f + [salario]
+
+
 def main():
     html_str = fetch_html()
     soup = BeautifulSoup(html_str, "html.parser")
@@ -57,11 +65,8 @@ def main():
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
-        funcionarios[0] += ["SALARIO"]
-        for f in funcionarios:
-            nivel = f[-1]
-            salario = get_salario_for_nivel(nivel, salarios)
-            writer.writerow(f + [salario])
+        for f in add_salary_to_funcionarios(funcionarios, salarios):
+            writer.writerow(f)
 
 
 if __name__ == '__main__':
