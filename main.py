@@ -32,7 +32,13 @@ def fetch_html():
     return content
 
 
-def get_salario_for_nivel(nivel, salarios):
+def get_salario_for_nivel(f, salarios, salario_comisionados):
+    nivel = f[-1]
+    funcion = f[-2].strip()
+    comisionado_to_index = {
+        "COMISIONADO DE NIVEL UNIVERSITARIO": 0,
+        "COMISIONADO DE NIVEL NO UNIVERSITARIO": 1
+    }
     m = re.match(r"(\d+)-([A|B|C])", nivel)
     salario = ''
     if m:
@@ -40,14 +46,16 @@ def get_salario_for_nivel(nivel, salarios):
         row = int(row) - 5
         col = {"A": 1, "B": 2, "C": 3}.get(col)
         salario = salarios[row][col]
+    elif index := comisionado_to_index.get(funcion) is not None:
+        salario = salario_comisionados[index]
     return salario
 
 
-def add_salary_to_funcionarios(funcionarios, salarios):
+def add_salary_to_funcionarios(funcionarios, salarios, salario_comisionados):
     yield funcionarios[0] + ["SALARIO"]
     for f in funcionarios[1:]:
-        nivel = f[-1]
-        salario = get_salario_for_nivel(nivel, salarios)
+        salario = get_salario_for_nivel(f, salarios, salario_comisionados)
+        salario = salario.replace('.', '')
         yield f + [salario]
 
 
@@ -56,16 +64,24 @@ def main():
     soup = BeautifulSoup(html_str, "html.parser")
 
     tables = soup.find_all("table")
-    nomina, tabla_salarial, *_ = [t for t in tables]
+    nomina, tabla_salarial, salario_comisionados, *_ = [t for t in tables]
 
     funcionarios = parse_table(nomina)
     salarios = parse_table(tabla_salarial)
+    salario_comisionados = parse_table(salario_comisionados)
+    salario_comisionados = [
+        salario_comisionados[1][1],
+        salario_comisionados[2][1]
+    ]
 
     filename = "nomina_itaipu.csv"
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
-        for f in add_salary_to_funcionarios(funcionarios, salarios):
+        funcionarios = add_salary_to_funcionarios(
+            funcionarios, salarios, salario_comisionados
+        )
+        for f in funcionarios:
             writer.writerow(f)
 
 
