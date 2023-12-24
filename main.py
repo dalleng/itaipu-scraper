@@ -32,12 +32,19 @@ def fetch_html():
     return content
 
 
-def get_salario_for_nivel(f, salarios, salario_comisionados):
+def get_salario_for_nivel(
+    f, salarios, salario_comisionados, salario_directores
+):
     nivel = f[-1]
     funcion = f[-2].strip()
     comisionado_to_index = {
         "COMISIONADO DE NIVEL UNIVERSITARIO": 0,
         "COMISIONADO DE NIVEL NO UNIVERSITARIO": 1
+    }
+    directores_to_index = {
+        "CONSEJER": 3,
+        "DTOR.ARE": 2,
+        "DTOR.GRA": 1
     }
     m = re.match(r"(\d+)-([A|B|C])", nivel)
     salario = ''
@@ -46,15 +53,21 @@ def get_salario_for_nivel(f, salarios, salario_comisionados):
         row = int(row) - 5
         col = {"A": 1, "B": 2, "C": 3}.get(col)
         salario = salarios[row][col]
-    elif index := comisionado_to_index.get(funcion) is not None:
-        salario = salario_comisionados[index]
+    elif (index_comisionado := comisionado_to_index.get(funcion)) is not None:
+        salario = salario_comisionados[index_comisionado]
+    elif (index_director := directores_to_index.get(nivel)) is not None:
+        salario = salario_directores[index_director][2]
     return salario
 
 
-def add_salary_to_funcionarios(funcionarios, salarios, salario_comisionados):
+def add_salary_to_funcionarios(
+    funcionarios, salarios, salario_comisionados, salario_directores
+):
     yield funcionarios[0] + ["SALARIO"]
     for f in funcionarios[1:]:
-        salario = get_salario_for_nivel(f, salarios, salario_comisionados)
+        salario = get_salario_for_nivel(
+            f, salarios, salario_comisionados, salario_directores
+        )
         salario = salario.replace('.', '')
         yield f + [salario]
 
@@ -64,7 +77,7 @@ def main():
     soup = BeautifulSoup(html_str, "html.parser")
 
     tables = soup.find_all("table")
-    nomina, tabla_salarial, salario_comisionados, *_ = [t for t in tables]
+    nomina, tabla_salarial, salario_comisionados, _, salario_directores, *__ = [t for t in tables]
 
     funcionarios = parse_table(nomina)
     salarios = parse_table(tabla_salarial)
@@ -73,13 +86,14 @@ def main():
         salario_comisionados[1][1],
         salario_comisionados[2][1]
     ]
+    salario_directores = parse_table(salario_directores)
 
     filename = "nomina_itaipu.csv"
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
         funcionarios = add_salary_to_funcionarios(
-            funcionarios, salarios, salario_comisionados
+            funcionarios, salarios, salario_comisionados, salario_directores
         )
         for f in funcionarios:
             writer.writerow(f)
