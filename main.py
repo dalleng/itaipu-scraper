@@ -3,6 +3,7 @@ import re
 import requests
 from urllib.parse import unquote
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 
 def extract_rows(table, col_element="td"):
@@ -72,6 +73,17 @@ def add_salary_to_funcionarios(
         yield f + [salario]
 
 
+def normalize_date(funcionarios):
+    yield next(funcionarios)
+    for f in funcionarios:
+        try:
+            admission_date = datetime.strptime(f[2], '%d/%m/%y')
+        except ValueError:
+            admission_date = datetime.strptime(f[2], '%m/%d/%y')
+        f[2] = admission_date.strftime('%Y-%m-%d')
+        yield f
+
+
 def main():
     html_str = fetch_html()
     soup = BeautifulSoup(html_str, "html.parser")
@@ -92,9 +104,9 @@ def main():
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
-        funcionarios = add_salary_to_funcionarios(
+        funcionarios = normalize_date(add_salary_to_funcionarios(
             funcionarios, salarios, salario_comisionados, salario_directores
-        )
+        ))
         for f in funcionarios:
             writer.writerow(f)
 
