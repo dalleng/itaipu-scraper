@@ -21,7 +21,7 @@ def parse_table(table):
     return headers + body
 
 
-def fetch_html():
+def fetch_content():
     response = requests.get(
         'https://nomina.itaipu.info/',
         headers={
@@ -85,7 +85,7 @@ def normalize_date(funcionarios):
 
 
 def main():
-    html_str = fetch_html()
+    html_str = fetch_content()
     soup = BeautifulSoup(html_str, "html.parser")
 
     tables = soup.find_all("table")
