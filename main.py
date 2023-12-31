@@ -84,6 +84,13 @@ def normalize_date(funcionarios):
         yield f
 
 
+def clean_cedula(funcionarios):
+    yield next(funcionarios)
+    for f in funcionarios:
+        f[0] = f[0].replace(".", "")
+        yield f
+
+
 def main():
     html_str = fetch_content()
     soup = BeautifulSoup(html_str, "html.parser")
@@ -104,9 +111,9 @@ def main():
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
-        funcionarios = normalize_date(add_salary_to_funcionarios(
+        funcionarios = clean_cedula(normalize_date(add_salary_to_funcionarios(
             funcionarios, salarios, salario_comisionados, salario_directores
-        ))
+        )))
         for f in funcionarios:
             writer.writerow(f)
 
