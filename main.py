@@ -1,4 +1,5 @@
 import csv
+import os
 import re
 import requests
 from urllib.parse import unquote
@@ -21,9 +22,9 @@ def parse_table(table):
     return headers + body
 
 
-def fetch_content():
+def fetch_content(url):
     response = requests.get(
-        'https://nomina.itaipu.info/',
+        url,
         headers={
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
@@ -92,9 +93,10 @@ def clean_cedula(funcionarios):
 
 
 def main():
-    html_str = fetch_content()
-    soup = BeautifulSoup(html_str, "html.parser")
+    url = os.environ.get("scrape_url", 'https://nomina.itaipu.info/')
+    html_str = fetch_content(url)
 
+    soup = BeautifulSoup(html_str, "html.parser")
     tables = soup.find_all("table")
     nomina, tabla_salarial, salario_comisionados, _, salario_directores, *__ = [t for t in tables]
 
