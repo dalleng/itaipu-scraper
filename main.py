@@ -109,7 +109,10 @@ def main():
     ]
     salario_directores = parse_table(salario_directores)
 
-    filename = "nomina_itaipu.csv"
+    filename = os.environ.get(
+        "output_filename_template", "nomina_itaipu_{}.csv"
+    )
+    filename = filename.format(datetime.now().strftime('%Y-%m-%d'))
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
