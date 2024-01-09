@@ -6,6 +6,9 @@ from urllib.parse import unquote
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+FUNCION_COLUMN = 3
+NIVEL_COLUMN = 4
+
 
 def extract_rows(table, col_element="td"):
     rows = []
@@ -37,8 +40,8 @@ def fetch_content(url):
 def get_salario_for_nivel(
     f, salarios, salario_comisionados, salario_directores
 ):
-    nivel = f[-1]
-    funcion = f[-2].strip()
+    nivel = f[NIVEL_COLUMN]
+    funcion = f[FUNCION_COLUMN].strip()
     comisionado_to_index = {
         "COMISIONADO DE NIVEL UNIVERSITARIO": 0,
         "COMISIONADO DE NIVEL NO UNIVERSITARIO": 1
