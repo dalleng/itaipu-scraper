@@ -33,6 +33,7 @@ def fetch_content(url):
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
     )
+    response.encoding = "utf-8"
     match = re.search(r"unescape\('(.*)'\)", response.text)
     content = unquote(match.group(1), encoding='latin-1').strip()
     return content
