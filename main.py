@@ -69,7 +69,7 @@ def get_salario_for_nivel(
 def add_salary_to_funcionarios(
     funcionarios, salarios, salario_comisionados, salario_directores
 ):
-    yield funcionarios[0] + ["SALARIO"]
+    yield funcionarios[0] + ["salario"]
     for f in funcionarios[1:]:
         salario = get_salario_for_nivel(
             f, salarios, salario_comisionados, salario_directores
@@ -96,6 +96,21 @@ def clean_cedula(funcionarios):
         yield f
 
 
+def replace_headers(funcionarios):
+    header_map = {
+        "CI N°": "cedula",
+        "NOMBRE Y APELLIDO": "nombre_y_apellido",
+        "FECHA DE ADMISIÓN": "fecha_de_admision",
+        "FUNCIÓN": "funcion",
+        "NIVEL": "nivel",
+        "SEDE": "sede",
+        "OBSERVACIÓN": "observacion",
+        "SALARIO": "salario",
+    }
+    funcionarios[0] = [header_map[header] for header in funcionarios[0]]
+    return funcionarios
+
+
 def main():
     url = os.environ.get("scrape_url", 'https://nomina.itaipu.info/')
     html_str = fetch_content(url)
@@ -120,6 +135,7 @@ def main():
 
     with open(filename, 'w') as file:
         writer = csv.writer(file)
+        funcionarios = replace_headers(funcionarios)
         funcionarios = clean_cedula(normalize_date(add_salary_to_funcionarios(
             funcionarios, salarios, salario_comisionados, salario_directores
         )))
