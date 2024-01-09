@@ -6,6 +6,7 @@ from urllib.parse import unquote
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+ADMISION_COLUMN = 2
 FUNCION_COLUMN = 3
 NIVEL_COLUMN = 4
 
@@ -81,10 +82,10 @@ def normalize_date(funcionarios):
     yield next(funcionarios)
     for f in funcionarios:
         try:
-            admission_date = datetime.strptime(f[2], '%d/%m/%y')
+            admission_date = datetime.strptime(f[ADMISION_COLUMN], '%d/%m/%y')
         except ValueError:
-            admission_date = datetime.strptime(f[2], '%m/%d/%y')
-        f[2] = admission_date.strftime('%Y-%m-%d')
+            admission_date = datetime.strptime(f[ADMISION_COLUMN], '%m/%d/%y')
+        f[ADMISION_COLUMN] = admission_date.strftime('%Y-%m-%d')
         yield f
 
 
