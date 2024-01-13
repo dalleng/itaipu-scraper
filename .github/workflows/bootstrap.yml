@@ -1,0 +1,15 @@
+name: boostrap
+
+on:
+    workflow_dispatch: 
+
+jobs:
+    bootstrap:
+        runs-on: ubuntu-latest
+        steps:
+        - name: Check out repo
+          uses: actions/checkout@v2
+        - name: Install dependencies
+          run: pip3 install -r requirements.txt
+        - name: Run bootstrap.sh
+          run: ./bootstrap.sh
