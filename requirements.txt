@@ -2,3 +2,4 @@ beautifulsoup4==4.12.2
 requests==2.31.0
 sqlite-utils==3.36
 datasette==0.64.6
+datasette-publish-vercel==0.14.2
