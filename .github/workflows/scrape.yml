@@ -8,6 +8,8 @@ on:
           required: true
           type: boolean
           default: false
+    schedule:
+      - cron: '0 0 * * *' # Runs at midnight every day
 
 jobs:
     scrape:
