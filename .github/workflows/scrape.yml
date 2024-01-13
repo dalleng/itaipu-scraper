@@ -1,10 +1,16 @@
-name: boostrap
+name: scrape
 
 on:
     workflow_dispatch: 
+      inputs:
+        bootstrap:
+          description: 'Run with --bootstrap?'
+          required: true
+          type: boolean
+          default: false
 
 jobs:
-    bootstrap:
+    scrape:
         runs-on: ubuntu-latest
         steps:
         - name: Check out repo
@@ -13,8 +19,13 @@ jobs:
             fetch-depth: 0
         - name: Install dependencies
           run: pip3 install -r requirements.txt
-        - name: Run bootstrap.sh
-          run: ./bootstrap.sh
+        - name: Scrape
+          run: |
+            if ${{ github.event.inputs.bootstrap }}; then
+              ./scrape.sh --bootstrap
+            else
+              ./scrape.sh
+            fi
         - name: Commit files
           run: |
             git config --local user.email "github-actions[bot]@users.noreply.github.com"
