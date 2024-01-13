@@ -23,7 +23,7 @@ jobs:
           run: pip3 install -r requirements.txt
         - name: Scrape
           run: |
-            if ${{ github.event.inputs.bootstrap }}; then
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && "${{ github.event.inputs.bootstrap }}"; then
               ./scrape.sh --bootstrap
             else
               ./scrape.sh
