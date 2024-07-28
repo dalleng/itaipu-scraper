@@ -13,7 +13,7 @@ NIVEL_COLUMN = 4
 
 def extract_rows(table, col_element="td"):
     rows = []
-    for row in table.find_all('tr'):
+    for row in table.find_all("tr"):
         rows.append([col.text.strip() for col in row.find_all(col_element)])
     return rows
 
@@ -30,31 +30,33 @@ def fetch_content(url):
     response = requests.get(
         url,
         headers={
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
     )
     response.encoding = "utf-8"
-    match = re.search(r"unescape\('(.*)'\)", response.text)
-    content = unquote(match.group(1), encoding='latin-1').strip()
+    html_text = response.text
+
+    # Remove commented script tag
+    html_text = html_text.replace(
+        """<!-- <script language="javascript"> document.write( unescape( \'\' ) );</script> -->""",
+        "",
+    )
+
+    match = re.search(r"unescape\(\s*(.*)\s*\)", html_text)
+    content = unquote(match.group(1), encoding="latin-1").strip()
     return content
 
 
-def get_salario_for_nivel(
-    f, salarios, salario_comisionados, salario_directores
-):
+def get_salario_for_nivel(f, salarios, salario_comisionados, salario_directores):
     nivel = f[NIVEL_COLUMN]
     funcion = f[FUNCION_COLUMN].strip()
     comisionado_to_index = {
         "COMISIONADO DE NIVEL UNIVERSITARIO": 0,
-        "COMISIONADO DE NIVEL NO UNIVERSITARIO": 1
+        "COMISIONADO DE NIVEL NO UNIVERSITARIO": 1,
     }
-    directores_to_index = {
-        "CONSEJER": 3,
-        "DTOR.ARE": 2,
-        "DTOR.GRA": 1
-    }
+    directores_to_index = {"CONSEJER": 3, "DTOR.ARE": 2, "DTOR.GRA": 1}
     m = re.match(r"(\d+)-([A|B|C])", nivel)
-    salario = ''
+    salario = ""
     if m:
         row, col = m.groups()
         row = int(row) - 5
@@ -75,7 +77,7 @@ def add_salary_to_funcionarios(
         salario = get_salario_for_nivel(
             f, salarios, salario_comisionados, salario_directores
         )
-        salario = salario.replace('.', '')
+        salario = salario.replace(".", "")
         yield f + [salario]
 
 
@@ -83,10 +85,10 @@ def normalize_date(funcionarios):
     yield next(funcionarios)
     for f in funcionarios:
         try:
-            admission_date = datetime.strptime(f[ADMISION_COLUMN], '%d/%m/%y')
+            admission_date = datetime.strptime(f[ADMISION_COLUMN], "%d/%m/%y")
         except ValueError:
-            admission_date = datetime.strptime(f[ADMISION_COLUMN], '%m/%d/%y')
-        f[ADMISION_COLUMN] = admission_date.strftime('%Y-%m-%d')
+            admission_date = datetime.strptime(f[ADMISION_COLUMN], "%m/%d/%y")
+        f[ADMISION_COLUMN] = admission_date.strftime("%Y-%m-%d")
         yield f
 
 
@@ -113,36 +115,37 @@ def replace_headers(funcionarios):
 
 
 def main():
-    url = os.environ.get("scrape_url", 'https://nomina.itaipu.info/')
+    url = os.environ.get("scrape_url", "https://nomina.itaipu.info/")
     html_str = fetch_content(url)
 
     soup = BeautifulSoup(html_str, "html.parser")
     tables = soup.find_all("table")
-    nomina, tabla_salarial, salario_comisionados, _, salario_directores, *__ = [t for t in tables]
+    nomina, tabla_salarial, salario_comisionados, _, salario_directores, *__ = [
+        t for t in tables
+    ]
 
     funcionarios = parse_table(nomina)
     salarios = parse_table(tabla_salarial)
     salario_comisionados = parse_table(salario_comisionados)
-    salario_comisionados = [
-        salario_comisionados[1][1],
-        salario_comisionados[2][1]
-    ]
+    salario_comisionados = [salario_comisionados[1][1], salario_comisionados[2][1]]
     salario_directores = parse_table(salario_directores)
 
-    filename = os.environ.get(
-        "output_filename_template", "nomina_itaipu_{}.csv"
-    )
-    filename = filename.format(datetime.now().strftime('%Y-%m-%d'))
+    filename = os.environ.get("output_filename_template", "nomina_itaipu_{}.csv")
+    filename = filename.format(datetime.now().strftime("%Y-%m-%d"))
 
-    with open(filename, 'w') as file:
+    with open(filename, "w") as file:
         writer = csv.writer(file)
         funcionarios = replace_headers(funcionarios)
-        funcionarios = clean_cedula(normalize_date(add_salary_to_funcionarios(
-            funcionarios, salarios, salario_comisionados, salario_directores
-        )))
+        funcionarios = clean_cedula(
+            normalize_date(
+                add_salary_to_funcionarios(
+                    funcionarios, salarios, salario_comisionados, salario_directores
+                )
+            )
+        )
         for f in funcionarios:
             writer.writerow(f)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
