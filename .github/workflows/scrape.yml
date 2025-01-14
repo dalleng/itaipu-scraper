@@ -40,6 +40,8 @@ jobs:
             default_author: github_actions
             message: 'Update sqlite db'
             add: '*.db --force'
+        - name: Install Vercel
+          run: npm install -g vercel 
         - name: Deploy Datasette using Vercel
           env:
             VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
