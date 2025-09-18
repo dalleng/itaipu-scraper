@@ -87,6 +87,7 @@ def main():
 
     if not os.path.exists(filename):
         logging.info(f"File {filename} not found")
+        return
 
     create_or_update_db(filename)
 
