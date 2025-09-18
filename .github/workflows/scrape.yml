@@ -19,8 +19,12 @@ jobs:
           uses: actions/checkout@v4
           with:
             fetch-depth: 0
+        - name: which python3
+          run: which python3
+        - name: which python
+          run: which python
         - name: Install dependencies
-          run: pip3 install -r requirements.txt
+          run: pip install -r requirements.txt
         - name: Scrape
           run: |
             if [ "${{ github.event_name }}" = "workflow_dispatch" ] && "${{ github.event.inputs.bootstrap }}"; then
