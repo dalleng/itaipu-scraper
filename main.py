@@ -43,6 +43,7 @@ def fetch_content(url):
     )
 
     match = re.search(r"unescape\(\s*(.*)\s*\)", html_text)
+    assert match is not None
     content = unquote(match.group(1), encoding="latin-1").strip()
     return content
 
