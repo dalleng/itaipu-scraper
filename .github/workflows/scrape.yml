@@ -19,12 +19,10 @@ jobs:
           uses: actions/checkout@v4
           with:
             fetch-depth: 0
-        - name: which python3
-          run: which python3 && python3 --version
-        - name: which python
-          run: which python && python --version
-        - name: Install dependencies
-          run: pip install -r requirements.txt
+        - name: Install Python dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
         - name: Scrape
           run: |
             if [ "${{ github.event_name }}" = "workflow_dispatch" ] && "${{ github.event.inputs.bootstrap }}"; then
@@ -52,4 +50,6 @@ jobs:
           run: |-
             datasette publish vercel itaipu.db \
               --token $VERCEL_TOKEN \
-              --project itaipu
+              --project itaipu \
+              --vercel-json vercel.json
+
