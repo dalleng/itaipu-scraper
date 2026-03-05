@@ -2,7 +2,7 @@ import csv
 import os
 import re
 import requests
-from urllib.parse import unquote
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from datetime import datetime
 
@@ -26,26 +26,44 @@ def parse_table(table):
     return headers + body
 
 
-def fetch_content(url):
-    response = requests.get(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        },
-    )
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
+
+def fetch_page(url):
+    response = requests.get(url, headers=REQUEST_HEADERS)
     response.encoding = "utf-8"
-    html_text = response.text
+    return response.text
 
-    # Remove commented script tag
-    html_text = html_text.replace(
-        """<!-- <script language="javascript"> document.write( unescape( \'\' ) );</script> -->""",
-        "",
-    )
 
-    match = re.search(r"unescape\(\s*(.*)\s*\)", html_text)
-    assert match is not None
-    content = unquote(match.group(1), encoding="latin-1").strip()
-    return content
+def fetch_employees(url, html_text):
+    # Extract JSON filename from the fetch() call in the page script
+    match = re.search(r"fetch\(['\"]\./(.*?\.json)['\"]", html_text)
+    assert match is not None, "Could not find JSON data URL in page"
+    json_url = urljoin(url, match.group(1))
+
+    data = requests.get(json_url, headers=REQUEST_HEADERS).json()
+
+    # First 2 elements are metadata (date and column headers); skip them
+    # Filter out entries without a CI value
+    col_headers = ["CI N°", "NOMBRE Y APELLIDO", "FECHA DE ADMISIÓN", "FUNCIÓN", "NIVEL", "SEDE", "OBSERVACIÓN"]
+    key_map = [
+        "EMPLEADOS DE LA ITAIPU BINACIONAL - MD",
+        "Column2",
+        "Column3",
+        "Column4",
+        "Column5",
+        "Column6",
+        "Column7",
+    ]
+    rows = [col_headers]
+    for emp in data[2:]:
+        ci = emp.get(key_map[0])
+        if not ci:
+            continue
+        rows.append([emp.get(k, "") for k in key_map])
+    return rows
 
 
 def get_salario_for_nivel(f, salarios, salario_comisionados, salario_directores):
@@ -83,12 +101,19 @@ def add_salary_to_funcionarios(
 
 
 def normalize_date(funcionarios):
+    formats = ["%d/%m/%Y", "%d/%m/%y", "%m/%d/%y", "%m/%d/%Y"]
     yield next(funcionarios)
     for f in funcionarios:
-        try:
-            admission_date = datetime.strptime(f[ADMISION_COLUMN], "%d/%m/%y")
-        except ValueError:
-            admission_date = datetime.strptime(f[ADMISION_COLUMN], "%m/%d/%y")
+        raw = f[ADMISION_COLUMN]
+        admission_date = None
+        for fmt in formats:
+            try:
+                admission_date = datetime.strptime(raw, fmt)
+                break
+            except ValueError:
+                continue
+        if admission_date is None:
+            raise ValueError(f"Could not parse date: {raw}")
         f[ADMISION_COLUMN] = admission_date.strftime("%Y-%m-%d")
         yield f
 
@@ -117,15 +142,16 @@ def replace_headers(funcionarios):
 
 def main():
     url = os.environ.get("scrape_url", "https://nomina.itaipu.info/")
-    html_str = fetch_content(url)
+    html_text = fetch_page(url)
 
-    soup = BeautifulSoup(html_str, "html.parser")
+    soup = BeautifulSoup(html_text, "html.parser")
     tables = soup.find_all("table")
-    nomina, tabla_salarial, salario_comisionados, _, salario_directores, *__ = [
+    _, tabla_salarial, salario_comisionados, _, salario_directores, *__ = [
         t for t in tables
     ]
 
-    funcionarios = parse_table(nomina)
+    funcionarios = fetch_employees(url, html_text)
+    print(funcionarios)
     salarios = parse_table(tabla_salarial)
     salario_comisionados = parse_table(salario_comisionados)
     salario_comisionados = [salario_comisionados[1][1], salario_comisionados[2][1]]
