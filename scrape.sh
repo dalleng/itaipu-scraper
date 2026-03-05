@@ -1,4 +1,5 @@
 #! /bin/bash
+set -e
 
 if [[ "$1" == "--bootstrap" ]]; then
     # scrape site from the web archive from 2023-09-03
