@@ -12,7 +12,8 @@
       "Bash(shasum:*)",
       "Bash(datasette publish vercel --help:*)",
       "WebFetch(domain:datasette.io)",
-      "Bash(datasette publish:*)"
+      "Bash(datasette publish:*)",
+      "Bash(sort:*)"
     ]
   }
 }

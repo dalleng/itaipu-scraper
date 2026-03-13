@@ -168,8 +168,10 @@ def main():
     salario_comisionados = [salario_comisionados[1][1], salario_comisionados[2][1]]
     salario_directores = parse_table(salario_directores)
 
-    filename = os.environ.get("output_filename_template", "nomina_itaipu_{}.csv")
-    filename = filename.format(datetime.now().strftime("%Y-%m-%d"))
+    data_dir = "data"
+    os.makedirs(data_dir, exist_ok=True)
+    template = os.environ.get("output_filename_template", "nomina_itaipu_{}.csv")
+    filename = os.path.join(data_dir, template.format(datetime.now().strftime("%Y-%m-%d")))
     logging.info(f"Writing to file {filename=}...")
 
     with open(filename, "w") as file:

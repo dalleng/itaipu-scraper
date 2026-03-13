@@ -43,7 +43,7 @@ def import_data(db, current_csv, table_name, checksum):
     )
     db["imports"].insert({
         "date": date,
-        "file": current_csv,
+        "file": os.path.basename(current_csv),
         "sha256_checksum": checksum
     })
 
@@ -65,10 +65,11 @@ def create_or_update_db(current_csv):
     if db["imports"].exists():
         logging.info(f"Checking if {current_csv} has been imported")
         if check_if_import_exists(db, current_checksum):
-            logging.info(f"Data in {current_csv} has already been imported")
+            logging.info(f"Data in {current_csv} has already been imported, deleting duplicate")
+            os.remove(current_csv)
             return
 
-    nomina_table_name, _ = current_csv.split('.')
+    nomina_table_name, _ = os.path.splitext(os.path.basename(current_csv))
     logging.info(f"Import data from {current_csv}")
     import_data(db, current_csv, nomina_table_name, current_checksum)
     db[nomina_table_name].enable_fts(["cedula", "nombre_y_apellido"])
@@ -76,7 +77,7 @@ def create_or_update_db(current_csv):
 
 def main():
     filename = os.environ.get(
-        "filename_template", "nomina_itaipu_{}.csv"
+        "filename_template", "data/nomina_itaipu_{}.csv"
     )
     try:
         filename = sys.argv[1]
