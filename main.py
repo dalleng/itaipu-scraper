@@ -5,10 +5,17 @@ import requests
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from datetime import datetime
+import logging
 
 ADMISION_COLUMN = 2
 FUNCION_COLUMN = 3
 NIVEL_COLUMN = 4
+
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 
 def extract_rows(table, col_element="td"):
@@ -32,6 +39,7 @@ REQUEST_HEADERS = {
 
 
 def fetch_page(url):
+    logging.info(f"Fetching page {url=}")
     response = requests.get(url, headers=REQUEST_HEADERS)
     response.encoding = "utf-8"
     return response.text
@@ -39,14 +47,15 @@ def fetch_page(url):
 
 def fetch_employees(url, html_text):
     # Extract JSON filename from the fetch() call in the page script
+    logging.info("Looking for JSON file with employees")
     match = re.search(r"fetch\(['\"]\./(.*?\.json)['\"]", html_text)
     assert match is not None, "Could not find JSON data URL in page"
     json_url = urljoin(url, match.group(1))
+    logging.info(f"JSON url found {json_url=}")
 
     data = requests.get(json_url, headers=REQUEST_HEADERS).json()
 
     # First 2 elements are metadata (date and column headers); skip them
-    # Filter out entries without a CI value
     col_headers = ["CI N°", "NOMBRE Y APELLIDO", "FECHA DE ADMISIÓN", "FUNCIÓN", "NIVEL", "SEDE", "OBSERVACIÓN"]
     key_map = [
         "EMPLEADOS DE LA ITAIPU BINACIONAL - MD",
@@ -60,7 +69,9 @@ def fetch_employees(url, html_text):
     rows = [col_headers]
     for emp in data[2:]:
         ci = emp.get(key_map[0])
+        # Filter out entries without a CI value
         if not ci:
+            logging.info(f"Found row without CI {emp=}")
             continue
         rows.append([emp.get(k, "") for k in key_map])
     return rows
@@ -151,7 +162,7 @@ def main():
     ]
 
     funcionarios = fetch_employees(url, html_text)
-    print(funcionarios)
+    logging.info("Extracting salary tables")
     salarios = parse_table(tabla_salarial)
     salario_comisionados = parse_table(salario_comisionados)
     salario_comisionados = [salario_comisionados[1][1], salario_comisionados[2][1]]
@@ -159,6 +170,7 @@ def main():
 
     filename = os.environ.get("output_filename_template", "nomina_itaipu_{}.csv")
     filename = filename.format(datetime.now().strftime("%Y-%m-%d"))
+    logging.info(f"Writing to file {filename=}...")
 
     with open(filename, "w") as file:
         writer = csv.writer(file)
