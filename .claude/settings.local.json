@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(xargs:*)",
+      "Bash(sqlite3:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(git -C /Users/diegoallen/src/itaipu-scraper log --oneline --all)",
+      "Bash(du:*)",
+      "Bash(shasum:*)"
     ]
   }
 }
