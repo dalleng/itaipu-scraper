@@ -1,5 +1,8 @@
-.python-version
 __pycache__
+
+# Avoid commiting local CSV, and db files
+# Let github actions scrape and create the files
 *.csv
 *.db
+
 .venv
