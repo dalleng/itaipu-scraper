@@ -4,5 +4,6 @@ __pycache__
 # Let github actions scrape and create the files
 *.csv
 *.db
+.claude/*
 
 .venv
