@@ -51,5 +51,7 @@ jobs:
             datasette publish vercel itaipu.db \
               --token $VERCEL_TOKEN \
               --project itaipu \
-              --vercel-json vercel.json
+              --vercel-json vercel.json \
+              --install datasette-hashed-urls \
+              --setting default_cache_ttl 86400
 
