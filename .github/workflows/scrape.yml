@@ -42,16 +42,24 @@ jobs:
             default_author: github_actions
             message: 'Update sqlite db'
             add: '*.db --force'
-        - name: Install Vercel
-          run: npm install -g vercel 
-        - name: Deploy Datasette using Vercel
+        - name: Set up SSH
           env:
-            VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          run: |-
-            datasette publish vercel itaipu.db \
-              --token $VERCEL_TOKEN \
-              --project itaipu \
-              --vercel-json vercel.json \
-              --install datasette-hashed-urls \
-              --setting default_cache_ttl 86400
+            SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          run: |
+            mkdir -p ~/.ssh
+            echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+            ssh-keyscan -H ${{ secrets.DO_HOST }} >> ~/.ssh/known_hosts
+
+        - name: Deploy database to droplet
+          run: |
+            rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+              itaipu.db \
+              ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/opt/itaipu/data/itaipu.db
+
+        - name: Restart Datasette
+          run: |
+            ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} \
+              "sudo systemctl restart datasette"
 
