@@ -17,6 +17,12 @@ logging.basicConfig(
 CATEGORIA_SUFFIX = " BASICO CAT."
 DATE_FORMATS = ["%d/%m/%Y", "%d/%m/%y", "%m/%d/%y", "%m/%d/%Y"]
 
+CSV_HEADER = [
+    "cedula", "nombre", "fecha_de_admision", "categoria", "salario", "sede",
+    "antiguedad_eby", "antiguedad", "titulo", "zo", "desa", "ayuda",
+    "he", "bonificaciones",
+]
+
 
 def fetch_xlsx_sheet(url):
     logging.info(f"Fetching xlsx {url=}")
@@ -70,30 +76,122 @@ def resolve_basico(raw, salary_scale):
     return raw_str, salary_scale[raw_str]
 
 
-def fetch_nomina(url, salary_scale):
+def _norm(v):
+    return str(v).strip() if v is not None else ""
+
+
+def fetch_nomina_base(url):
+    """WEB2 — canonical nomina. Returns dict keyed by cedula and the cedula order."""
     ws = fetch_xlsx_sheet(url)
     rows = ws.iter_rows(values_only=True)
     headers = list(next(rows))
     idx = {h: headers.index(h) for h in ("Cedula", "Nombre", "Basico", "Ingreso", "Sede")}
-    out: list[list[str]] = [
-        ["cedula", "nombre", "fecha_de_admision", "categoria", "salario", "sede"]
-    ]
+    base: dict[str, dict] = {}
+    order: list[str] = []
     for row in rows:
-        cedula = row[idx["Cedula"]]
-        if cedula is None or str(cedula).strip() == "":
-            logging.info(f"Skipping row with empty cedula: {row}")
+        cedula_raw = row[idx["Cedula"]]
+        if cedula_raw is None or _norm(cedula_raw) == "":
+            logging.info(f"Skipping WEB2 row with empty cedula: {row}")
             continue
-        categoria, salario = resolve_basico(row[idx["Basico"]], salary_scale)
-        sede = row[idx["Sede"]]
-        out.append([
-            str(cedula).strip().replace(".", ""),
-            str(row[idx["Nombre"]]).strip(),
-            normalize_date(row[idx["Ingreso"]]),
+        cedula = _norm(cedula_raw).replace(".", "")
+        base[cedula] = {
+            "nombre": _norm(row[idx["Nombre"]]),
+            "basico": _norm(row[idx["Basico"]]),
+            "ingreso": _norm(row[idx["Ingreso"]]),
+            "sede": _norm(row[idx["Sede"]]),
+        }
+        order.append(cedula)
+    return base, order
+
+
+def fetch_bonificaciones(url):
+    """WEB3 — bonus data plus a copy of the base columns (used for discrepancy checks)."""
+    ws = fetch_xlsx_sheet(url)
+    rows = ws.iter_rows(values_only=True)
+    next(rows)  # row 0: "Mes: <month>" snapshot marker
+    next(rows)  # row 1: blank
+    headers = list(next(rows))
+    cols = ("Cedula", "Nombre", "Basico", "Ingreso", "Sede",
+            "Antiguedad", "Antigueda2", "Titulo", "Zo", "Desa",
+            "Ayuda Habi", "He", "Bonificaci")
+    idx = {h: headers.index(h) for h in cols}
+    out: dict[str, dict] = {}
+    for row in rows:
+        cedula_raw = row[idx["Cedula"]]
+        if cedula_raw is None or _norm(cedula_raw) == "":
+            logging.info(f"Skipping WEB3 row with empty cedula: {row}")
+            continue
+        cedula = _norm(cedula_raw).replace(".", "")
+        out[cedula] = {
+            "nombre": _norm(row[idx["Nombre"]]),
+            "basico": _norm(row[idx["Basico"]]),
+            "ingreso": _norm(row[idx["Ingreso"]]),
+            "sede": _norm(row[idx["Sede"]]),
+            "antiguedad_eby": int(str(row[idx["Antiguedad"]] or 0)),
+            "antiguedad": int(str(row[idx["Antigueda2"]] or 0)),
+            "titulo": int(str(row[idx["Titulo"]] or 0)),
+            "zo": int(str(row[idx["Zo"]] or 0)),
+            "desa": int(str(row[idx["Desa"]] or 0)),
+            "ayuda": int(str(row[idx["Ayuda Habi"]] or 0)),
+            "he": int(str(row[idx["He"]] or 0)),
+            "bonificaciones": int(str(row[idx["Bonificaci"]] or 0)),
+        }
+    return out
+
+
+SHARED_FIELDS = ("nombre", "basico", "ingreso", "sede")
+ZERO_BONUS = {k: 0 for k in (
+    "antiguedad_eby", "antiguedad", "titulo", "zo", "desa", "ayuda",
+    "he", "bonificaciones",
+)}
+
+
+def join_nominas(base, order, bonus, salary_scale):
+    only_in_web3 = sorted(set(bonus) - set(base))
+    if only_in_web3:
+        logging.warning(
+            f"{len(only_in_web3)} cedula(s) in WEB3 but not WEB2 (skipping): {only_in_web3[:10]}"
+        )
+
+    discrepancies = 0
+    missing_in_web3 = 0
+    for cedula in order:
+        b = base[cedula]
+        bo = bonus.get(cedula)
+        if bo is None:
+            missing_in_web3 += 1
+            logging.warning(f"cedula {cedula} in WEB2 but not WEB3; emitting zeros for bonus columns")
+            bo = ZERO_BONUS
+        else:
+            for f in SHARED_FIELDS:
+                if b[f] != bo[f]:
+                    discrepancies += 1
+                    logging.warning(
+                        f"cedula {cedula} {f} differs: WEB2={b[f]!r} WEB3={bo[f]!r} — using WEB2"
+                    )
+        categoria, salario = resolve_basico(b["basico"], salary_scale)
+        yield [
+            cedula,
+            b["nombre"],
+            normalize_date(b["ingreso"]),
             categoria,
             str(salario),
-            str(sede).strip() if sede is not None else "",
-        ])
-    return out
+            b["sede"],
+            str(bo["antiguedad_eby"]),
+            str(bo["antiguedad"]),
+            str(bo["titulo"]),
+            str(bo["zo"]),
+            str(bo["desa"]),
+            str(bo["ayuda"]),
+            str(bo["he"]),
+            str(bo["bonificaciones"]),
+        ]
+    logging.info(
+        f"Join complete: {len(order)} WEB2 rows, "
+        f"{missing_in_web3} missing in WEB3, "
+        f"{len(only_in_web3)} extra in WEB3, "
+        f"{discrepancies} shared-field discrepancies"
+    )
 
 
 def main():
@@ -105,9 +203,15 @@ def main():
         "scrape_url_web2",
         "https://www.eby.gov.py/sueldos/nominas/assets/WEB2.xlsx",
     )
+    web3 = os.environ.get(
+        "scrape_url_web3",
+        "https://www.eby.gov.py/sueldos/nominas/assets/WEB3.xlsx",
+    )
 
     salary_scale = fetch_salary_scale(web1)
-    rows = fetch_nomina(web2, salary_scale)
+    base, order = fetch_nomina_base(web2)
+    bonus = fetch_bonificaciones(web3)
+    rows = list(join_nominas(base, order, bonus, salary_scale))
 
     template = os.environ.get(
         "output_filename_template",
@@ -115,9 +219,10 @@ def main():
     )
     filename = template.format(datetime.now().strftime("%Y-%m-%d"))
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    logging.info(f"Writing {len(rows) - 1} rows to {filename}")
+    logging.info(f"Writing {len(rows)} rows to {filename}")
     with open(filename, "w") as f:
         writer = csv.writer(f)
+        writer.writerow(CSV_HEADER)
         for r in rows:
             writer.writerow(r)
 
