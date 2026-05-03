@@ -81,7 +81,7 @@ def create_or_update_db(current_csv):
 
 def main():
     filename = os.environ.get(
-        "filename_template", "data/nomina_itaipu_{}.csv"
+        "filename_template", "data/itaipu/nomina_itaipu_{}.csv"
     )
     try:
         filename = sys.argv[1]
