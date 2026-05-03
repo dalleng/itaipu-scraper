@@ -1,0 +1,64 @@
+name: scrape_itaipu
+
+on:
+    workflow_dispatch:
+      inputs:
+        bootstrap:
+          description: 'Run with --bootstrap?'
+          required: true
+          type: boolean
+          default: false
+    schedule:
+      - cron: '0 0 * * *' # midnight UTC
+
+jobs:
+    scrape:
+        runs-on: ubuntu-latest
+        steps:
+        - name: Check out repo
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+        - name: Install Python dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+        - name: Scrape
+          run: |
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && "${{ github.event.inputs.bootstrap }}"; then
+              ./scrape.sh itaipu --bootstrap
+            else
+              ./scrape.sh itaipu
+            fi
+        - name: Commit changes
+          uses: EndBug/add-and-commit@v9
+          with:
+            default_author: github_actions
+            message: 'Add scraped itaipu CSV files'
+            add: 'data/itaipu/*.csv --force'
+        - name: Commit changes
+          uses: EndBug/add-and-commit@v9
+          with:
+            default_author: github_actions
+            message: 'Update itaipu sqlite db'
+            add: 'itaipu.db --force'
+        - name: Set up SSH
+          env:
+            SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          run: |
+            mkdir -p ~/.ssh
+            echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+            ssh-keyscan -H ${{ secrets.DO_HOST }} >> ~/.ssh/known_hosts
+
+        - name: Deploy itaipu database to droplet
+          run: |
+            rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+              itaipu.db \
+              ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/opt/itaipu/data/itaipu.db
+
+        - name: Restart Datasette
+          run: |
+            ssh -i ~/.ssh/deploy_key \
+              ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }} \
+              "sudo systemctl restart datasette"
