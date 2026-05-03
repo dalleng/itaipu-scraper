@@ -1,5 +1,5 @@
+import argparse
 import re
-import sys
 import os
 import hashlib
 import logging
@@ -57,8 +57,7 @@ def check_if_import_exists(db, current_checksum):
     return count > 0
 
 
-def create_or_update_db(current_csv):
-    db_file = os.environ.get("dbfile", default="itaipu.db")
+def create_or_update_db(current_csv, db_file):
     db = Database(db_file)
     current_checksum = compute_checksum(current_csv)
 
@@ -80,13 +79,21 @@ def create_or_update_db(current_csv):
 
 
 def main():
-    filename = os.environ.get(
-        "filename_template", "data/itaipu/nomina_itaipu_{}.csv"
+    parser = argparse.ArgumentParser(description="Import a nomina CSV into a SQLite DB")
+    parser.add_argument(
+        "--db", default="itaipu.db",
+        help="SQLite DB file (default: itaipu.db)",
     )
-    try:
-        filename = sys.argv[1]
-    except IndexError:
-        filename = filename.format(datetime.now().strftime('%Y-%m-%d'))
+    parser.add_argument(
+        "--csv", default=None,
+        help="CSV path to import (default: data/itaipu/nomina_itaipu_<TODAY>.csv)",
+    )
+    args = parser.parse_args()
+
+    filename = args.csv or os.path.join(
+        "data/itaipu",
+        f"nomina_itaipu_{datetime.now().strftime('%Y-%m-%d')}.csv",
+    )
 
     logging.info(f"Trying to import {filename}")
 
@@ -94,7 +101,7 @@ def main():
         logging.info(f"File {filename} not found")
         return
 
-    create_or_update_db(filename)
+    create_or_update_db(filename, args.db)
 
 
 if __name__ == "__main__":

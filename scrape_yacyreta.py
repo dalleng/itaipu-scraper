@@ -1,3 +1,4 @@
+import argparse
 import csv
 import logging
 import os
@@ -195,29 +196,34 @@ def join_nominas(base, order, bonus, salary_scale):
 
 
 def main():
-    web1 = os.environ.get(
-        "scrape_url_web1",
-        "https://www.eby.gov.py/sueldos/nominas/assets/WEB1.xlsx",
+    parser = argparse.ArgumentParser(description="Scrape EBY/yacyreta nomina + bonificaciones to CSV")
+    parser.add_argument(
+        "--web1-url", default="https://www.eby.gov.py/sueldos/nominas/assets/WEB1.xlsx",
+        help="WEB1 (escala salarial) URL",
     )
-    web2 = os.environ.get(
-        "scrape_url_web2",
-        "https://www.eby.gov.py/sueldos/nominas/assets/WEB2.xlsx",
+    parser.add_argument(
+        "--web2-url", default="https://www.eby.gov.py/sueldos/nominas/assets/WEB2.xlsx",
+        help="WEB2 (canonical nomina) URL",
     )
-    web3 = os.environ.get(
-        "scrape_url_web3",
-        "https://www.eby.gov.py/sueldos/nominas/assets/WEB3.xlsx",
+    parser.add_argument(
+        "--web3-url", default="https://www.eby.gov.py/sueldos/nominas/assets/WEB3.xlsx",
+        help="WEB3 (bonificaciones) URL",
     )
+    parser.add_argument(
+        "--output", default=None,
+        help="CSV output path (default: data/yacyreta/nomina_yacyreta_<TODAY>.csv)",
+    )
+    args = parser.parse_args()
 
-    salary_scale = fetch_salary_scale(web1)
-    base, order = fetch_nomina_base(web2)
-    bonus = fetch_bonificaciones(web3)
+    salary_scale = fetch_salary_scale(args.web1_url)
+    base, order = fetch_nomina_base(args.web2_url)
+    bonus = fetch_bonificaciones(args.web3_url)
     rows = list(join_nominas(base, order, bonus, salary_scale))
 
-    template = os.environ.get(
-        "output_filename_template",
-        "data/yacyreta/nomina_yacyreta_{}.csv",
+    filename = args.output or os.path.join(
+        "data/yacyreta",
+        f"nomina_yacyreta_{datetime.now().strftime('%Y-%m-%d')}.csv",
     )
-    filename = template.format(datetime.now().strftime("%Y-%m-%d"))
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     logging.info(f"Writing {len(rows)} rows to {filename}")
     with open(filename, "w") as f:

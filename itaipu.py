@@ -1,3 +1,4 @@
+import argparse
 import csv
 import os
 import re
@@ -152,8 +153,18 @@ def replace_headers(funcionarios):
 
 
 def main():
-    url = os.environ.get("scrape_url", "https://nomina.itaipu.info/")
-    html_text = fetch_page(url)
+    parser = argparse.ArgumentParser(description="Scrape itaipu.info nomina to CSV")
+    parser.add_argument(
+        "--url", default="https://nomina.itaipu.info/",
+        help="source URL (default: live site)",
+    )
+    parser.add_argument(
+        "--output", default=None,
+        help="CSV output path (default: data/itaipu/nomina_itaipu_<TODAY>.csv)",
+    )
+    args = parser.parse_args()
+
+    html_text = fetch_page(args.url)
 
     soup = BeautifulSoup(html_text, "html.parser")
     tables = soup.find_all("table")
@@ -161,17 +172,18 @@ def main():
         t for t in tables
     ]
 
-    funcionarios = fetch_employees(url, html_text)
+    funcionarios = fetch_employees(args.url, html_text)
     logging.info("Extracting salary tables")
     salarios = parse_table(tabla_salarial)
     salario_comisionados = parse_table(salario_comisionados)
     salario_comisionados = [salario_comisionados[1][1], salario_comisionados[2][1]]
     salario_directores = parse_table(salario_directores)
 
-    data_dir = "data/itaipu"
-    os.makedirs(data_dir, exist_ok=True)
-    template = os.environ.get("output_filename_template", "nomina_itaipu_{}.csv")
-    filename = os.path.join(data_dir, template.format(datetime.now().strftime("%Y-%m-%d")))
+    filename = args.output or os.path.join(
+        "data/itaipu",
+        f"nomina_itaipu_{datetime.now().strftime('%Y-%m-%d')}.csv",
+    )
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
     logging.info(f"Writing to file {filename=}...")
 
     with open(filename, "w") as file:
