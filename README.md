@@ -15,7 +15,7 @@ El sitio oficial de nómina de Itaipu dificulta intencionalmente la extracción 
 
 ### Cómo funciona
 
-- `main.py` — Scraper principal. Descarga el HTML de la nómina, extrae las tablas salariales y los datos JSON de empleados, los procesa y genera un archivo CSV en `data/`.
+- `itaipu.py` — Scraper principal. Descarga el HTML de la nómina, extrae las tablas salariales y los datos JSON de empleados, los procesa y genera un archivo CSV en `data/itaipu/`.
 - `create_or_update_db.py` — Importa los CSVs a SQLite. Usa checksums SHA256 para evitar duplicados y crea índices full-text sobre cédula y nombre.
 - `scrape.sh` — Script orquestador que ejecuta el scraper y luego actualiza la base de datos.
 
@@ -46,7 +46,7 @@ Itaipu's official payroll website intentionally makes data extraction difficult:
 
 ### How it works
 
-- `main.py` — Main scraper. Downloads the payroll HTML, extracts salary tables and employee JSON data, processes them, and outputs a CSV file to `data/`.
+- `itaipu.py` — Main scraper. Downloads the payroll HTML, extracts salary tables and employee JSON data, processes them, and outputs a CSV file to `data/itaipu/`.
 - `create_or_update_db.py` — Imports CSVs into SQLite. Uses SHA256 checksums to avoid duplicates and creates full-text indexes on ID number and name fields.
 - `scrape.sh` — Orchestration script that runs the scraper and then updates the database.
 
