@@ -35,7 +35,7 @@ jobs:
           with:
             default_author: github_actions
             message: 'Add scraped CSV files'
-            add: 'data/*.csv --force'
+            add: 'data/**/*.csv --force'
         - name: Commit changes
           uses: EndBug/add-and-commit@v9
           with:
@@ -56,6 +56,12 @@ jobs:
             rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
               itaipu.db \
               ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/opt/itaipu/data/itaipu.db
+
+        - name: Deploy yacyreta database to droplet
+          run: |
+            rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+              yacyreta.db \
+              ${{ secrets.DO_USER }}@${{ secrets.DO_HOST }}:/opt/itaipu/data/yacyreta.db
 
         - name: Restart Datasette
           run: |

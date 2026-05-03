@@ -72,7 +72,11 @@ def create_or_update_db(current_csv):
     nomina_table_name, _ = os.path.splitext(os.path.basename(current_csv))
     logging.info(f"Import data from {current_csv}")
     import_data(db, current_csv, nomina_table_name, current_checksum)
-    db[nomina_table_name].enable_fts(["cedula", "nombre_y_apellido"])
+    fts_candidates = ["cedula", "nombre", "nombre_y_apellido"]
+    table_columns = db[nomina_table_name].columns_dict
+    fts_cols = [c for c in fts_candidates if c in table_columns]
+    if fts_cols:
+        db[nomina_table_name].enable_fts(fts_cols)
 
 
 def main():

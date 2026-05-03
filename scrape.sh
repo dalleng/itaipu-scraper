@@ -19,3 +19,6 @@ fi
 
 python main.py
 python create_or_update_db.py
+
+python scrape_yacyreta.py
+dbfile=yacyreta.db filename_template=data/yacyreta/nomina_yacyreta_{}.csv python create_or_update_db.py
