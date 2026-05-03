@@ -8,7 +8,7 @@ from io import BytesIO
 import requests
 from openpyxl import load_workbook
 
-from itaipu import REQUEST_HEADERS
+from scrape_itaipu import REQUEST_HEADERS
 
 logging.basicConfig(
     level=logging.DEBUG,
