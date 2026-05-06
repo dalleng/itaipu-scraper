@@ -3,7 +3,7 @@ name: scrape_yacyreta
 on:
     workflow_dispatch:
     schedule:
-      - cron: '0 1 * * *' # 01:00 UTC (1h offset from itaipu)
+      - cron: '43 4,16 * * *' # 04:43 and 16:43 UTC (offset from itaipu)
 
 jobs:
     scrape:

@@ -9,7 +9,7 @@ on:
           type: boolean
           default: false
     schedule:
-      - cron: '0 0 * * *' # midnight UTC
+      - cron: '17 3,15 * * *' # 03:17 and 15:17 UTC
 
 jobs:
     scrape:
