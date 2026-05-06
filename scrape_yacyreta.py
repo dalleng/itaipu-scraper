@@ -36,22 +36,25 @@ def fetch_xlsx_sheet(url):
     return ws
 
 
+def iter_dict_rows(ws, header_row=0):
+    rows = ws.iter_rows(values_only=True)
+    for _ in range(header_row):
+        next(rows)
+    headers = next(rows)
+    for row in rows:
+        yield dict(zip(headers, row))
+
+
 def fetch_salary_scale(url):
     ws = fetch_xlsx_sheet(url)
-    rows = ws.iter_rows(values_only=True)
-    headers = next(rows)
-    cat_idx = headers.index("Categoria")
-    bas_idx = headers.index("Basico")
     scale: dict[str, int] = {}
-    for row in rows:
-        cat_raw = row[cat_idx]
-        bas = row[bas_idx]
-        if cat_raw is None or bas is None:
+    for r in iter_dict_rows(ws):
+        if r["categoria"] is None or r["basico"] is None:
             continue
-        cat = str(cat_raw).strip()
+        cat = str(r["categoria"]).strip()
         if cat.endswith(CATEGORIA_SUFFIX):
             cat = cat[: -len(CATEGORIA_SUFFIX)].strip()
-        scale[cat] = int(str(bas))
+        scale[cat] = int(str(r["basico"]))
     logging.info(f"Loaded {len(scale)} salary-scale entries")
     return scale
 
@@ -84,22 +87,18 @@ def _norm(v):
 def fetch_nomina_base(url):
     """WEB2 — canonical nomina. Returns dict keyed by cedula and the cedula order."""
     ws = fetch_xlsx_sheet(url)
-    rows = ws.iter_rows(values_only=True)
-    headers = list(next(rows))
-    idx = {h: headers.index(h) for h in ("Cedula", "Nombre", "Basico", "Ingreso", "Sede")}
     base: dict[str, dict] = {}
     order: list[str] = []
-    for row in rows:
-        cedula_raw = row[idx["Cedula"]]
-        if cedula_raw is None or _norm(cedula_raw) == "":
-            logging.info(f"Skipping WEB2 row with empty cedula: {row}")
+    for r in iter_dict_rows(ws):
+        if _norm(r["cedula"]) == "":
+            logging.info(f"Skipping WEB2 row with empty cedula: {r}")
             continue
-        cedula = _norm(cedula_raw).replace(".", "")
+        cedula = _norm(r["cedula"]).replace(".", "")
         base[cedula] = {
-            "nombre": _norm(row[idx["Nombre"]]),
-            "basico": _norm(row[idx["Basico"]]),
-            "ingreso": _norm(row[idx["Ingreso"]]),
-            "sede": _norm(row[idx["Sede"]]),
+            "nombre": _norm(r["nombre"]),
+            "basico": _norm(r["basico"]),
+            "ingreso": _norm(r["ingreso"]),
+            "sede": _norm(r["sede"]),
         }
         order.append(cedula)
     return base, order
@@ -108,34 +107,26 @@ def fetch_nomina_base(url):
 def fetch_bonificaciones(url):
     """WEB3 — bonus data plus a copy of the base columns (used for discrepancy checks)."""
     ws = fetch_xlsx_sheet(url)
-    rows = ws.iter_rows(values_only=True)
-    next(rows)  # row 0: "Mes: <month>" snapshot marker
-    next(rows)  # row 1: blank
-    headers = list(next(rows))
-    cols = ("Cedula", "Nombre", "Basico", "Ingreso", "Sede",
-            "Antiguedad", "Antigueda2", "Titulo", "Zo", "Desa",
-            "Ayuda Habi", "He", "Bonificaci")
-    idx = {h: headers.index(h) for h in cols}
     out: dict[str, dict] = {}
-    for row in rows:
-        cedula_raw = row[idx["Cedula"]]
-        if cedula_raw is None or _norm(cedula_raw) == "":
-            logging.info(f"Skipping WEB3 row with empty cedula: {row}")
+    # row 0: "Mes: <month>" snapshot marker; row 1: blank; row 2: headers
+    for r in iter_dict_rows(ws, header_row=2):
+        if _norm(r["cedula"]) == "":
+            logging.info(f"Skipping WEB3 row with empty cedula: {r}")
             continue
-        cedula = _norm(cedula_raw).replace(".", "")
+        cedula = _norm(r["cedula"]).replace(".", "")
         out[cedula] = {
-            "nombre": _norm(row[idx["Nombre"]]),
-            "basico": _norm(row[idx["Basico"]]),
-            "ingreso": _norm(row[idx["Ingreso"]]),
-            "sede": _norm(row[idx["Sede"]]),
-            "antiguedad_eby": int(str(row[idx["Antiguedad"]] or 0)),
-            "antiguedad": int(str(row[idx["Antigueda2"]] or 0)),
-            "titulo": int(str(row[idx["Titulo"]] or 0)),
-            "zo": int(str(row[idx["Zo"]] or 0)),
-            "desa": int(str(row[idx["Desa"]] or 0)),
-            "ayuda": int(str(row[idx["Ayuda Habi"]] or 0)),
-            "he": int(str(row[idx["He"]] or 0)),
-            "bonificaciones": int(str(row[idx["Bonificaci"]] or 0)),
+            "nombre": _norm(r["nombre"]),
+            "basico": _norm(r["basico"]),
+            "ingreso": _norm(r["ingreso"]),
+            "sede": _norm(r["sede"]),
+            "antiguedad_eby": int(str(r["antiguedad"] or 0)),
+            "antiguedad": int(str(r["antigueda2"] or 0)),
+            "titulo": int(str(r["titulo"] or 0)),
+            "zo": int(str(r["zo"] or 0)),
+            "desa": int(str(r["desa"] or 0)),
+            "ayuda": int(str(r["ayuda"] or 0)),
+            "he": int(str(r["he"] or 0)),
+            "bonificaciones": int(str(r["bonificaciones"] or 0)),
         }
     return out
 
