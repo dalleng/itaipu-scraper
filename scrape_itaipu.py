@@ -1,9 +1,10 @@
 import argparse
+import base64
 import csv
+import json
 import os
 import re
 import requests
-from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from datetime import datetime
 import logging
@@ -47,14 +48,11 @@ def fetch_page(url):
 
 
 def fetch_employees(url, html_text):
-    # Extract JSON filename from the fetch() call in the page script
-    logging.info("Looking for JSON file with employees")
-    match = re.search(r"fetch\(['\"]\./(.*?\.json)['\"]", html_text)
-    assert match is not None, "Could not find JSON data URL in page"
-    json_url = urljoin(url, match.group(1))
-    logging.info(f"JSON url found {json_url=}")
-
-    data = requests.get(json_url, headers=REQUEST_HEADERS).json()
+    # Employee data is embedded as a base64-encoded JSON string in window.__D
+    logging.info("Looking for embedded employee data")
+    match = re.search(r"window\.__D\s*=\s*['\"]([A-Za-z0-9+/=]+)['\"]", html_text)
+    assert match is not None, "Could not find embedded data in page"
+    data = json.loads(base64.b64decode(match.group(1)).decode("utf-8"))
 
     # First 2 elements are metadata (date and column headers); skip them
     col_headers = ["CI N°", "NOMBRE Y APELLIDO", "FECHA DE ADMISIÓN", "FUNCIÓN", "NIVEL", "SEDE", "OBSERVACIÓN"]
