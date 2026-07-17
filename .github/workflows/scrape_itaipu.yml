@@ -26,10 +26,18 @@ jobs:
         - name: Scrape
           run: |
             if [ "${{ github.event_name }}" = "workflow_dispatch" ] && "${{ github.event.inputs.bootstrap }}"; then
-              ./scrape.sh itaipu --bootstrap
+              cmd=(./scrape.sh itaipu --bootstrap)
             else
-              ./scrape.sh itaipu
+              cmd=(./scrape.sh itaipu)
             fi
+            for attempt in 1 2 3; do
+              if "${cmd[@]}"; then
+                exit 0
+              fi
+              echo "Attempt $attempt failed"
+              [ "$attempt" -lt 3 ] && sleep 10
+            done
+            exit 1
         - name: Commit changes
           uses: EndBug/add-and-commit@v9
           with:

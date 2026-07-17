@@ -18,7 +18,15 @@ jobs:
             python -m pip install --upgrade pip
             pip install -r requirements.txt
         - name: Scrape
-          run: ./scrape.sh yacyreta
+          run: |
+            for attempt in 1 2 3; do
+              if ./scrape.sh yacyreta; then
+                exit 0
+              fi
+              echo "Attempt $attempt failed"
+              [ "$attempt" -lt 3 ] && sleep 10
+            done
+            exit 1
         - name: Commit changes
           uses: EndBug/add-and-commit@v9
           with:
