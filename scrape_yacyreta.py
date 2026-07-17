@@ -113,6 +113,7 @@ def fetch_bonificaciones(url):
         if _norm(r["cedula"]) == "":
             logging.info(f"Skipping WEB3 row with empty cedula: {r}")
             continue
+        print(f"{r.keys()}")
         cedula = _norm(r["cedula"]).replace(".", "")
         out[cedula] = {
             "nombre": _norm(r["nombre"]),
@@ -126,7 +127,7 @@ def fetch_bonificaciones(url):
             "desa": int(str(r["desa"] or 0)),
             "ayuda": int(str(r["ayuda"] or 0)),
             "he": int(str(r["he"] or 0)),
-            "bonificaciones": int(str(r["bonificaciones"] or 0)),
+            "bonificaciones": int(str(r["bonificaci"] or 0)),
         }
     return out
 
