@@ -10,6 +10,8 @@ from openpyxl import load_workbook
 
 from scrape_itaipu import REQUEST_HEADERS
 
+logger = logging.getLogger(__name__)
+
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -24,9 +26,22 @@ CSV_HEADER = [
     "he", "bonificaciones",
 ]
 
+SHARED_FIELDS = ("nombre", "basico", "ingreso", "sede")
+BONUS_COLUMNS = {
+    "antiguedad_eby": "antiguedad",
+    "antiguedad": "antigueda2",
+    "titulo": "titulo",
+    "zo": "zo",
+    "desa": "desa",
+    "ayuda": "ayuda",
+    "he": "he",
+    "bonificaciones": "bonificaci",
+}
+ZERO_BONUS = dict.fromkeys(BONUS_COLUMNS, 0)
+
 
 def fetch_xlsx_sheet(url):
-    logging.info(f"Fetching xlsx {url=}")
+    logger.info(f"Fetching xlsx {url=}")
     r = requests.get(url, headers=REQUEST_HEADERS)
     r.raise_for_status()
     wb = load_workbook(BytesIO(r.content), read_only=True, data_only=True)
@@ -36,11 +51,16 @@ def fetch_xlsx_sheet(url):
     return ws
 
 
-def iter_dict_rows(ws, header_row=0):
+def iter_dict_rows(ws, source, required_headers):
     rows = ws.iter_rows(values_only=True)
-    for _ in range(header_row):
-        next(rows)
-    headers = next(rows)
+    for headers in rows:
+        if "nombre_ape" in headers and "nombre" not in headers:
+            headers = tuple("nombre" if cell == "nombre_ape" else cell for cell in headers)
+        if required_headers.issubset(headers):
+            break
+    else:
+        columns = ", ".join(sorted(required_headers))
+        raise ValueError(f"Could not find the {source} header row with columns {columns}")
     for row in rows:
         yield dict(zip(headers, row))
 
@@ -48,14 +68,14 @@ def iter_dict_rows(ws, header_row=0):
 def fetch_salary_scale(url):
     ws = fetch_xlsx_sheet(url)
     scale: dict[str, int] = {}
-    for r in iter_dict_rows(ws):
+    for r in iter_dict_rows(ws, "WEB1", {"categoria", "basico"}):
         if r["categoria"] is None or r["basico"] is None:
             continue
         cat = str(r["categoria"]).strip()
         if cat.endswith(CATEGORIA_SUFFIX):
             cat = cat[: -len(CATEGORIA_SUFFIX)].strip()
         scale[cat] = int(str(r["basico"]))
-    logging.info(f"Loaded {len(scale)} salary-scale entries")
+    logger.info(f"Loaded {len(scale)} salary-scale entries")
     return scale
 
 
@@ -89,59 +109,39 @@ def fetch_nomina_base(url):
     ws = fetch_xlsx_sheet(url)
     base: dict[str, dict] = {}
     order: list[str] = []
-    for r in iter_dict_rows(ws):
+    for r in iter_dict_rows(ws, "WEB2", {"cedula", *SHARED_FIELDS}):
         if _norm(r["cedula"]) == "":
-            logging.info(f"Skipping WEB2 row with empty cedula: {r}")
+            logger.info(f"Skipping WEB2 row with empty cedula: {r}")
             continue
         cedula = _norm(r["cedula"]).replace(".", "")
-        base[cedula] = {
-            "nombre": _norm(r["nombre"]),
-            "basico": _norm(r["basico"]),
-            "ingreso": _norm(r["ingreso"]),
-            "sede": _norm(r["sede"]),
-        }
+        base[cedula] = {field: _norm(r[field]) for field in SHARED_FIELDS}
         order.append(cedula)
     return base, order
 
 
 def fetch_bonificaciones(url):
-    """WEB3 — bonus data plus a copy of the base columns (used for discrepancy checks)."""
+    """WEB3 — bonus data and any roster fields available for cross-checking."""
     ws = fetch_xlsx_sheet(url)
     out: dict[str, dict] = {}
-    # row 0: "Mes: <month>" snapshot marker; row 1: blank; row 2: headers
-    for r in iter_dict_rows(ws, header_row=2):
+    required_headers = {"cedula", "nombre", *BONUS_COLUMNS.values()}
+    for r in iter_dict_rows(ws, "WEB3", required_headers):
         if _norm(r["cedula"]) == "":
-            logging.info(f"Skipping WEB3 row with empty cedula: {r}")
+            logger.info(f"Skipping WEB3 row with empty cedula: {r}")
             continue
         cedula = _norm(r["cedula"]).replace(".", "")
-        out[cedula] = {
-            "nombre": _norm(r["nombre"]),
-            "basico": _norm(r["basico"]),
-            "ingreso": _norm(r["ingreso"]),
-            "sede": _norm(r["sede"]),
-            "antiguedad_eby": int(str(r["antiguedad"] or 0)),
-            "antiguedad": int(str(r["antigueda2"] or 0)),
-            "titulo": int(str(r["titulo"] or 0)),
-            "zo": int(str(r["zo"] or 0)),
-            "desa": int(str(r["desa"] or 0)),
-            "ayuda": int(str(r["ayuda"] or 0)),
-            "he": int(str(r["he"] or 0)),
-            "bonificaciones": int(str(r["bonificaci"] or 0)),
-        }
+        employee: dict[str, str | int] = {field: _norm(r[field]) for field in SHARED_FIELDS if field in r}
+        employee.update({
+            field: int(str(r[column] or 0))
+            for field, column in BONUS_COLUMNS.items()
+        })
+        out[cedula] = employee
     return out
-
-
-SHARED_FIELDS = ("nombre", "basico", "ingreso", "sede")
-ZERO_BONUS = {k: 0 for k in (
-    "antiguedad_eby", "antiguedad", "titulo", "zo", "desa", "ayuda",
-    "he", "bonificaciones",
-)}
 
 
 def join_nominas(base, order, bonus, salary_scale):
     only_in_web3 = sorted(set(bonus) - set(base))
     if only_in_web3:
-        logging.warning(
+        logger.warning(
             f"{len(only_in_web3)} cedula(s) in WEB3 but not WEB2 (skipping): {only_in_web3[:10]}"
         )
 
@@ -152,13 +152,13 @@ def join_nominas(base, order, bonus, salary_scale):
         bo = bonus.get(cedula)
         if bo is None:
             missing_in_web3 += 1
-            logging.warning(f"cedula {cedula} in WEB2 but not WEB3; emitting zeros for bonus columns")
+            logger.warning(f"cedula {cedula} in WEB2 but not WEB3; emitting zeros for bonus columns")
             bo = ZERO_BONUS
         else:
             for f in SHARED_FIELDS:
-                if b[f] != bo[f]:
+                if f in bo and b[f] != bo[f]:
                     discrepancies += 1
-                    logging.warning(
+                    logger.warning(
                         f"cedula {cedula} {f} differs: WEB2={b[f]!r} WEB3={bo[f]!r} — using WEB2"
                     )
         categoria, salario = resolve_basico(b["basico"], salary_scale)
@@ -178,7 +178,7 @@ def join_nominas(base, order, bonus, salary_scale):
             str(bo["he"]),
             str(bo["bonificaciones"]),
         ]
-    logging.info(
+    logger.info(
         f"Join complete: {len(order)} WEB2 rows, "
         f"{missing_in_web3} missing in WEB3, "
         f"{len(only_in_web3)} extra in WEB3, "
@@ -216,7 +216,7 @@ def main():
         f"nomina_yacyreta_{datetime.now().strftime('%Y-%m-%d')}.csv",
     )
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    logging.info(f"Writing {len(rows)} rows to {filename}")
+    logger.info(f"Writing {len(rows)} rows to {filename}")
     with open(filename, "w") as f:
         writer = csv.writer(f)
         writer.writerow(CSV_HEADER)

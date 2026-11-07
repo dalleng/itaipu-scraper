@@ -1,12 +1,14 @@
 import argparse
-import re
-import os
 import hashlib
 import logging
+import os
+import re
 from datetime import datetime
-from sqlite_utils import Database
-from sqlite_utils.utils import rows_from_file, Format, TypeTracker
 
+from sqlite_utils import Database
+from sqlite_utils.utils import Format, TypeTracker, rows_from_file
+
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -53,7 +55,7 @@ def check_if_import_exists(db, current_checksum):
         "select count(*) from imports where sha256_checksum=?",
         [current_checksum]
     )
-    count = list(results)[0].get("count(*)", 0)
+    count = next(results).get("count(*)", 0)
     return count > 0
 
 
@@ -62,14 +64,14 @@ def create_or_update_db(current_csv, db_file):
     current_checksum = compute_checksum(current_csv)
 
     if db["imports"].exists():
-        logging.info(f"Checking if {current_csv} has been imported")
+        logger.info(f"Checking if {current_csv} has been imported")
         if check_if_import_exists(db, current_checksum):
-            logging.info(f"Data in {current_csv} has already been imported, deleting duplicate")
+            logger.info(f"Data in {current_csv} has already been imported, deleting duplicate")
             os.remove(current_csv)
             return
 
     nomina_table_name, _ = os.path.splitext(os.path.basename(current_csv))
-    logging.info(f"Import data from {current_csv}")
+    logger.info(f"Import data from {current_csv}")
     import_data(db, current_csv, nomina_table_name, current_checksum)
     fts_candidates = ["cedula", "nombre", "nombre_y_apellido"]
     table_columns = db[nomina_table_name].columns_dict
@@ -95,10 +97,10 @@ def main():
         f"nomina_itaipu_{datetime.now().strftime('%Y-%m-%d')}.csv",
     )
 
-    logging.info(f"Trying to import {filename}")
+    logger.info(f"Trying to import {filename}")
 
     if not os.path.exists(filename):
-        logging.info(f"File {filename} not found")
+        logger.info(f"File {filename} not found")
         return
 
     create_or_update_db(filename, args.db)

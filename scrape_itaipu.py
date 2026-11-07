@@ -2,17 +2,19 @@ import argparse
 import base64
 import csv
 import json
+import logging
 import os
 import re
+from datetime import datetime
+
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
-import logging
 
 ADMISION_COLUMN = 2
 FUNCION_COLUMN = 3
 NIVEL_COLUMN = 4
 
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -41,7 +43,7 @@ REQUEST_HEADERS = {
 
 
 def fetch_page(url):
-    logging.info(f"Fetching page {url=}")
+    logger.info(f"Fetching page {url=}")
     response = requests.get(url, headers=REQUEST_HEADERS)
     response.encoding = "utf-8"
     return response.text
@@ -49,7 +51,7 @@ def fetch_page(url):
 
 def fetch_employees(url, html_text):
     # Employee data is embedded as a base64-encoded JSON string in window.__D
-    logging.info("Looking for embedded employee data")
+    logger.info("Looking for embedded employee data")
     match = re.search(r"window\.__D\s*=\s*['\"]([A-Za-z0-9+/=]+)['\"]", html_text)
     assert match is not None, "Could not find embedded data in page"
     data = json.loads(base64.b64decode(match.group(1)).decode("utf-8"))
@@ -70,7 +72,7 @@ def fetch_employees(url, html_text):
         ci = emp.get(key_map[0])
         # Filter out entries without a CI value
         if not ci:
-            logging.info(f"Found row without CI {emp=}")
+            logger.info(f"Found row without CI {emp=}")
             continue
         rows.append([emp.get(k, "") for k in key_map])
     return rows
@@ -171,7 +173,7 @@ def main():
     ]
 
     funcionarios = fetch_employees(args.url, html_text)
-    logging.info("Extracting salary tables")
+    logger.info("Extracting salary tables")
     salarios = parse_table(tabla_salarial)
     salario_comisionados = parse_table(salario_comisionados)
     salario_comisionados = [salario_comisionados[1][1], salario_comisionados[2][1]]
@@ -182,7 +184,7 @@ def main():
         f"nomina_itaipu_{datetime.now().strftime('%Y-%m-%d')}.csv",
     )
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-    logging.info(f"Writing to file {filename=}...")
+    logger.info(f"Writing to file {filename=}...")
 
     with open(filename, "w") as file:
         writer = csv.writer(file)
